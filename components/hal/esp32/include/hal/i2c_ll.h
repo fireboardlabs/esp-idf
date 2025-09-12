@@ -554,6 +554,7 @@ static inline void i2c_ll_get_stop_timing(i2c_dev_t *hw, int *setup_time, int *h
 __attribute__((always_inline))
 static inline void i2c_ll_write_txfifo(i2c_dev_t *hw, const uint8_t *ptr, uint8_t len)
 {
+    hw->fifo_conf.nonfifo_en = 0;
     uint32_t fifo_addr = (hw == &I2C0) ? 0x6001301c : 0x6002701c;
     for(int i = 0; i < len; i++) {
         WRITE_PERI_REG(fifo_addr, ptr[i]);
@@ -572,9 +573,16 @@ static inline void i2c_ll_write_txfifo(i2c_dev_t *hw, const uint8_t *ptr, uint8_
 __attribute__((always_inline))
 static inline void i2c_ll_read_rxfifo(i2c_dev_t *hw, uint8_t *ptr, uint8_t len)
 {
+    hw->fifo_conf.nonfifo_en = 1;
     for(int i = 0; i < len; i++) {
-        ptr[i] = HAL_FORCE_READ_U32_REG_FIELD(hw->fifo_data, data);
+        // Known issue that hardware read fifo will cause data lose, (fifo pointer jump over a random address)
+        // use `DPORT_REG_READ` can avoid this issue.
+        ptr[i] = hw->ram_data[i];
     }
+    hw->fifo_conf.nonfifo_en = 0;
+
+    hw->fifo_conf.rx_fifo_rst = 1;
+    hw->fifo_conf.rx_fifo_rst = 0;
 }
 
 /**
