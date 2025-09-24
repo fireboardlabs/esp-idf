@@ -588,12 +588,17 @@ IRAM_ATTR static void i2c_isr_receive_handler(i2c_master_bus_t *i2c_master)
     i2c_hal_context_t *hal = &i2c_master->base->hal;
     if (atomic_load(&i2c_master->status) == I2C_STATUS_READ) {
         i2c_operation_t *i2c_operation = &i2c_master->i2c_trans.ops[i2c_master->trans_idx];
+        if( i2c_operation == NULL ){
+            return;
+        }
         portENTER_CRITICAL_ISR(&i2c_master->base->spinlock);
-        i2c_ll_read_rxfifo(hal->dev, i2c_operation->data + i2c_operation->bytes_used, i2c_master->rx_cnt);
-        /* rx_cnt bytes have just been read, increment the number of bytes used from the buffer */
-        i2c_master->w_r_size = i2c_master->rx_cnt;
-        i2c_operation->bytes_used += i2c_master->rx_cnt;
-        i2c_master->cmd_idx = 0;
+        if( i2c_operation->data != NULL ){
+            i2c_ll_read_rxfifo(hal->dev, i2c_operation->data + i2c_operation->bytes_used, i2c_master->rx_cnt);
+            /* rx_cnt bytes have just been read, increment the number of bytes used from the buffer */
+            i2c_master->w_r_size = i2c_master->rx_cnt;
+            i2c_operation->bytes_used += i2c_master->rx_cnt;
+            i2c_master->cmd_idx = 0;
+        }
 
         /* Test if there are still some remaining bytes to send. */
         if (i2c_operation->bytes_used == i2c_operation->total_bytes) {
